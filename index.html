@@ -1,13 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
+<head>
     <meta charset="UTF-8" />
     <title>Dropbox Thumbnail Display</title>
-  </head>
-  <body>
+</head>
+<body>
     <input type="file" id="fileInput" />
     <button onclick="uploadFile()">Upload File</button>
-
     <div id="imageContainer"></div>
 
     <input type="text" id="videoUrl" placeholder="Enter Video URL" />
@@ -17,264 +16,253 @@
     <input type="number" id="endTimeSec" placeholder="End Second" />
     <button onclick="setVideo()" ontouchstart="setVideo()">Load Video</button>
 
+    <button onclick="selectLocalVideo()">Select Local Video</button>
+
     <video id="videoPlayer" width="720" height="480" controls></video>
 
     <script>
-      async function uploadFile() {
-        const fileInput = document.getElementById("fileInput");
-        const file = fileInput.files[0]; // Get the first file selected
+        async function uploadFile() {
+            const fileInput = document.getElementById("fileInput");
+            const file = fileInput.files[0]; // Get the first file selected
 
-        if (!file) {
-          alert("Please select a file first.");
-          return;
-        }
-
-        const accessToken =
-          "sl-Wm"; // Replace this with your actual access token
-        const dropboxPath = `/test/test/${Date.now()}.mp4`;
-
-        try {
-          const response = await fetch(
-            "https://content.dropboxapi.com/2/files/upload",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/octet-stream",
-                "Dropbox-API-Arg": JSON.stringify({
-                  path: dropboxPath,
-                  mode: { ".tag": "add" },
-                  autorename: true,
-                  mute: false,
-                }),
-              },
-              body: file, // The file to upload
+            if (!file) {
+                alert("Please select a file first.");
+                return;
             }
-          );
 
-          if (!response.ok) {
-            throw new Error(
-              `Server responded with ${response.status}: ${response.statusText}`
-            );
-          }
+            const accessToken = "sl-Wm"; // Replace this with your actual access token
+            const dropboxPath = `/test/test/${Date.now()}.mp4`;
 
-          const data = await response.json();
-          console.log("File uploaded successfully:", data);
-          alert("File uploaded successfully.");
-        } catch (error) {
-          console.error("Error uploading file:", error);
-          alert("Error uploading file. See console for more details.");
+            try {
+                const response = await fetch("https://content.dropboxapi.com/2/files/upload", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        "Content-Type": "application/octet-stream",
+                        "Dropbox-API-Arg": JSON.stringify({
+                            path: dropboxPath,
+                            mode: { ".tag": "add" },
+                            autorename: true,
+                            mute: false,
+                        }),
+                    },
+                    body: file, // The file to upload
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log("File uploaded successfully:", data);
+                alert("File uploaded successfully.");
+            } catch (error) {
+                console.error("Error uploading file:", error);
+                alert("Error uploading file. See console for more details.");
+            }
         }
-      }
-    </script>
 
-    <script>
-      var video;
-      var wasPlayingBeforeBlur = false; // Tracks if the video was playing before losing focus
+        function setVideo() {
+            var videoUrl = document.getElementById("videoUrl").value;
+            var startMin = document.getElementById("startTimeMin").value;
+            var startSec = document.getElementById("startTimeSec").value;
+            var endMin = document.getElementById("endTimeMin").value;
+            var endSec = document.getElementById("endTimeSec").value;
 
-      window.onload = function () {
-        video = document.getElementById("videoPlayer");
-        window.addEventListener("blur", handleWindowBlur, false);
-        window.addEventListener("focus", handleWindowFocus, false);
-        window.addEventListener("keydown", handleKeyPress, false); // Add this line
-      };
-      function handleKeyPress(event) {
-        switch (event.key) {
-          case "x": // 'x' key
-            video.currentTime = Math.max(0, video.currentTime - 5);
-            break;
-          case "c": // 'c' key
-            video.currentTime = Math.min(video.duration, video.currentTime + 5);
-            break;
-        }
-      }
+            // Convert to integer or use default values
+            startMin = startMin ? parseInt(startMin) : 0;
+            startSec = startSec ? parseInt(startSec) : 0;
+            endMin = endMin ? parseInt(endMin) : undefined;
+            endSec = endSec ? parseInt(endSec) : undefined;
 
-      function setVideo() {
-        var videoUrl = document.getElementById("videoUrl").value;
-        var startMin = document.getElementById("startTimeMin").value;
-        var startSec = document.getElementById("startTimeSec").value;
-        var endMin = document.getElementById("endTimeMin").value;
-        var endSec = document.getElementById("endTimeSec").value;
+            var video = document.getElementById("videoPlayer");
+            video.src = videoUrl;
 
-        // Convert to integer or use default values
-        startMin = startMin ? parseInt(startMin) : 0;
-        startSec = startSec ? parseInt(startSec) : 0;
-        endMin = endMin ? parseInt(endMin) : undefined;
-        endSec = endSec ? parseInt(endSec) : undefined;
-
-        video.src = videoUrl;
-
-        // Set video start time or play from beginning
-        video.currentTime = startMin * 60 + startSec;
-
-        video.addEventListener("timeupdate", function () {
-          var loopEndPoint =
-            typeof endMin !== "undefined" && typeof endSec !== "undefined"
-              ? endMin * 60 + endSec
-              : video.duration;
-
-          // Check if the current time is close to the loop end point
-          if (video.currentTime >= loopEndPoint - 0.5) {
+            // Set video start time or play from beginning
             video.currentTime = startMin * 60 + startSec;
-            video.play();
-          }
-        });
 
-        video.addEventListener("play", function () {
-          isVideoPlaying = true;
-        });
+            video.addEventListener("timeupdate", function () {
+                var loopEndPoint =
+                    typeof endMin !== "undefined" && typeof endSec !== "undefined"
+                        ? endMin * 60 + endSec
+                        : video.duration;
 
-        video.addEventListener("pause", function () {
-          isVideoPlaying = false;
-        });
-      }
+                // Check if the current time is close to the loop end point
+                if (video.currentTime >= loopEndPoint - 0.5) {
+                    video.currentTime = startMin * 60 + startSec;
+                    video.play();
+                }
+            });
 
-      function handleWindowBlur() {
-        if (!video.paused) {
-          video.pause();
-          wasPlayingBeforeBlur = true; // Remember that the video was playing
-        } else {
-          wasPlayingBeforeBlur = false;
+            video.addEventListener("play", function () {
+                isVideoPlaying = true;
+            });
+
+            video.addEventListener("pause", function () {
+                isVideoPlaying = false;
+            });
         }
-      }
 
-      function handleWindowFocus() {
-        if (wasPlayingBeforeBlur && video.paused) {
-          video
-            .play()
-            .catch((e) => console.error("Error attempting to play video:", e));
-          wasPlayingBeforeBlur = false;
-        }
-      }
-
-      // Additional JavaScript for seek bar preview (requires more complex implementation)
-    </script>
-
-    <script>
-      async function fetchTemporaryLink(filePath) {
-        const accessToken =
-          "sl.-Wm"; // Replace with your actual access token
-        const url = "https://api.dropboxapi.com/2/files/get_temporary_link";
-
-        try {
-          const response = await fetch(url, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ path: filePath }),
-          });
-
-          if (!response.ok) {
-            throw new Error(`Error: ${response.statusText}`);
-          }
-
-          const data = await response.json();
-          return data.link; // Assuming the response contains a property 'link' with the URL
-        } catch (error) {
-          console.error("Failed to fetch temporary link:", error);
-          return null;
-        }
-      }
-
-      async function fetchThumbnail(path) {
-        try {
-          const response = await fetch(
-            "https://content.dropboxapi.com/2/files/get_thumbnail_v2",
-            {
-              method: "POST",
-              headers: {
-                Authorization:
-                  "Bearer sl.-Wm", // Replace with your actual access token
-                "Dropbox-API-Arg": JSON.stringify({
-                  resource: { ".tag": "path", path: path },
-                  format: { ".tag": "png" },
-                  size: { ".tag": "w128h128" },
-                }),
-                "Content-Type": "application/octet-stream",
-              },
-            }
-          );
-          const blob = await response.blob();
-          return window.URL.createObjectURL(blob);
-        } catch (error) {
-          console.error("Error fetching thumbnail:", error);
-          return null; // Return null or a default thumbnail URL
-        }
-      }
-
-      async function displayThumbnails() {
-        try {
-          const response = await fetch(
-            "https://api.dropboxapi.com/2/files/list_folder",
-            {
-              method: "POST",
-              headers: {
-                Authorization:
-                  "", // Replace with your actual access token
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                path: "/test/test", // Adjust the path as needed
-                recursive: false,
-                include_media_info: true,
-                limit: 100,
-              }),
-            }
-          );
-          const data = await response.json();
-
-          if (!data.entries || !Array.isArray(data.entries)) {
-            console.error("Unexpected response structure:", data);
-            return;
-          }
-
-          const imageContainer = document.getElementById("imageContainer");
-          for (const link of data.entries) {
-            const thumbnailUrl = await fetchThumbnail(link.path_display);
-            const temp_link = await fetchTemporaryLink(link.path_display);
-
-            const img = document.createElement("img");
-            img.src = thumbnailUrl;
-            img.style.width = "128px";
-            img.style.height = "128px";
-            img.alt = link.name;
-            img.ontouchstart = function () {
-              // document.getElementById("videoUrl").value = temp_link;
-              // setVideo();
-              window.open(
-                "http://192.168.1.7:8888?link=" + temp_link,
-                "_blank"
-              );
+        function selectLocalVideo() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'video/*';
+            input.onchange = function(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    const videoUrl = URL.createObjectURL(file);
+                    const video = document.getElementById('videoPlayer');
+                    video.src = videoUrl;
+                    video.play();
+                }
             };
-            img.onclick = function () {
-              // document.getElementById("videoUrl").value = temp_link;
-              // setVideo();
-              window.open(
-                "http://192.168.1.7:8888?link=" + temp_link,
-                "_blank"
-              );
-            };
-
-            imageContainer.appendChild(img);
-          }
-        } catch (error) {
-          console.error("Error:", error);
+            input.click();
         }
-      }
 
-      function getQueryParam() {
-        const urlParams = new URLSearchParams(window.location.search);
-        let url = urlParams.get("link");
+        var video;
+        var wasPlayingBeforeBlur = false; // Tracks if the video was playing before losing focus
 
-        document.getElementById("videoUrl").value = url;
-        setTimeout(function () {
-          setVideo();
-        }, 100);
-      }
-      getQueryParam();
-      displayThumbnails();
+        window.onload = function () {
+            video = document.getElementById("videoPlayer");
+            window.addEventListener("blur", handleWindowBlur, false);
+            window.addEventListener("focus", handleWindowFocus, false);
+            window.addEventListener("keydown", handleKeyPress, false); // Add this line
+        };
+
+        function handleKeyPress(event) {
+            switch (event.key) {
+                case "x": // 'x' key
+                    video.currentTime = Math.max(0, video.currentTime - 5);
+                    break;
+                case "c": // 'c' key
+                    video.currentTime = Math.min(video.duration, video.currentTime + 5);
+                    break;
+            }
+        }
+
+        function handleWindowBlur() {
+            if (!video.paused) {
+                video.pause();
+                wasPlayingBeforeBlur = true; // Remember that the video was playing
+            } else {
+                wasPlayingBeforeBlur = false;
+            }
+        }
+
+        function handleWindowFocus() {
+            if (wasPlayingBeforeBlur && video.paused) {
+                video.play().catch((e) => console.error("Error attempting to play video:", e));
+                wasPlayingBeforeBlur = false;
+            }
+        }
+
+        async function fetchTemporaryLink(filePath) {
+            const accessToken = "sl.-Wm"; // Replace with your actual access token
+            const url = "https://api.dropboxapi.com/2/files/get_temporary_link";
+
+            try {
+                const response = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ path: filePath }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                return data.link; // Assuming the response contains a property 'link' with the URL
+            } catch (error) {
+                console.error("Failed to fetch temporary link:", error);
+                return null;
+            }
+        }
+
+        async function fetchThumbnail(path) {
+            try {
+                const response = await fetch("https://content.dropboxapi.com/2/files/get_thumbnail_v2", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer sl.-Wm`, // Replace with your actual access token
+                        "Dropbox-API-Arg": JSON.stringify({
+                            resource: { ".tag": "path", path: path },
+                            format: { ".tag": "png" },
+                            size: { ".tag": "w128h128" },
+                        }),
+                        "Content-Type": "application/octet-stream",
+                    },
+                });
+                const blob = await response.blob();
+                return window.URL.createObjectURL(blob);
+            } catch (error) {
+                console.error("Error fetching thumbnail:", error);
+                return null; // Return null or a default thumbnail URL
+            }
+        }
+
+        async function displayThumbnails() {
+            try {
+                const response = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
+                    method: "POST",
+                    headers: {
+                        Authorization: "", // Replace with your actual access token
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        path: "/test/test", // Adjust the path as needed
+                        recursive: false,
+                        include_media_info: true,
+                        limit: 100,
+                    }),
+                });
+                const data = await response.json();
+
+                if (!data.entries || !Array.isArray(data.entries)) {
+                    console.error("Unexpected response structure:", data);
+                    return;
+                }
+
+                const imageContainer = document.getElementById("imageContainer");
+                for (const link of data.entries) {
+                    const thumbnailUrl = await fetchThumbnail(link.path_display);
+                    const temp_link = await fetchTemporaryLink(link.path_display);
+
+                    const img = document.createElement("img");
+                    img.src = thumbnailUrl;
+                    img.style.width = "128px";
+                    img.style.height = "128px";
+                    img.alt = link.name;
+                    img.ontouchstart = function () {
+                        window.open("http://192.168.1.7:8888?link=" + temp_link, "_blank");
+                    };
+                    img.onclick = function () {
+                        window.open("http://192.168.1.7:8888?link=" + temp_link, "_blank");
+                    };
+
+                    imageContainer.appendChild(img);
+                }
+            } catch (error) {
+                console.error("Error:", error);
+            }
+        }
+
+        function getQueryParam() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let url = urlParams.get("link");
+
+            document.getElementById("videoUrl").value = url;
+            setTimeout(function () {
+                setVideo();
+            }, 100);
+        }
+
+        getQueryParam();
+        displayThumbnails();
     </script>
-  </body>
+</body>
 </html>
+
