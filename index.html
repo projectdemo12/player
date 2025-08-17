@@ -1,268 +1,385 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <title>Dropbox Thumbnail Display</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Secure A‑B Loop Video Player</title>
+  <style>
+    :root{
+      --bg:#0b1020;--panel:#131a33;--muted:#7781a7;--text:#e7ebff;--accent:#7aa2ff;--accent-2:#8ef;--danger:#ff6b6b;--ok:#2ecc71;
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0;background:radial-gradient(1200px 800px at 10% -10%,#13204a 0%,#0b1020 40%),
+          radial-gradient(900px 700px at 110% 10%,#18214a 0%,#0b1020 50%);
+         color:var(--text);font:14px/1.35 system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,sans-serif}
+    .container{max-width:1100px;margin:24px auto;padding:0 16px}
+    .card{background:var(--panel);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.25);border:1px solid rgba(255,255,255,.08)}
+    .header{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.06)}
+    h1{margin:0;font-size:18px;letter-spacing:.3px}
+    .pill{font-size:12px;color:#0b1020;background:linear-gradient(90deg,var(--accent),var(--accent-2));padding:6px 10px;border-radius:999px;font-weight:600}
+
+    .controls{display:grid;gap:12px;padding:16px}
+    .row{display:grid;grid-template-columns:1fr auto;gap:10px}
+    .row.split{grid-template-columns:repeat(2,1fr)}
+    .row.three{grid-template-columns:1fr 1fr 1fr}
+
+    input[type="text"],input[type="number"],input[type="password"],button,select{
+      background:#0f1530;border:1px solid rgba(255,255,255,.1);color:var(--text);
+      padding:10px 12px;border-radius:10px;outline:none;transition:.15s ease;min-height:40px
+    }
+    input::placeholder{color:#94a0c6}
+    input:focus{border-color:var(--accent)}
+    button{cursor:pointer;font-weight:600}
+    .primary{background:linear-gradient(180deg,#2e5cff,#1b44d1);border:none}
+    .ghost{background:transparent;border:1px dashed rgba(255,255,255,.2)}
+    .danger{background:linear-gradient(180deg,#ff8585,#ff6b6b);border:none}
+    .ok{background:linear-gradient(180deg,#34d399,#10b981);border:none}
+
+    .video-wrap{padding:16px}
+    video{width:100%;max-height:60vh;background:#000;border-radius:12px;border:1px solid rgba(255,255,255,.08)}
+
+    .help{padding:12px 16px;border-top:1px solid rgba(255,255,255,.06);color:var(--muted)}
+    .inline-note{margin-top:6px;padding:10px 12px;background:#0e1430;border:1px solid rgba(255,255,255,.08);border-radius:10px}
+    .inline-note strong{color:#fff}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;padding:14px}
+    .thumb{border-radius:10px;border:1px solid rgba(255,255,255,.08);overflow:hidden;background:#0b1020}
+    .thumb img{display:block;width:100%;height:128px;object-fit:cover}
+    .thumb .meta{padding:6px 8px;font-size:12px;color:#9fb0dc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+    .drop{border:1.5px dashed rgba(255,255,255,.25);border-radius:12px;padding:16px;text-align:center;color:#9fb0dc}
+    .drop.drag{border-color:var(--accent);color:#cfe2ff;background:#0d1433}
+
+    .kbd{font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace;background:#0b0f24;border:1px solid rgba(255,255,255,.15);padding:2px 6px;border-radius:6px}
+
+    .row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .spacer{height:8px}
+  </style>
 </head>
 <body>
-    <input type="file" id="fileInput" />
-    <button onclick="uploadFile()">Upload File</button>
-    <div id="imageContainer"></div>
+  <div class="container card">
+    <div class="header">
+      <h1>Secure A‑B Loop Video Player</h1>
+      <span class="pill">Improved UI • Mixed‑Content Safe</span>
+    </div>
 
-    <input type="text" id="videoUrl" placeholder="Enter Video URL" />
-    <input type="number" id="startTimeMin" placeholder="Start Minute" />
-    <input type="number" id="startTimeSec" placeholder="Start Second" />
-    <input type="number" id="endTimeMin" placeholder="End Minute" />
-    <input type="number" id="endTimeSec" placeholder="End Second" />
-    <button onclick="setVideo()" ontouchstart="setVideo()">Load Video</button>
+    <div class="controls">
+      <!-- URL + Load -->
+      <div class="row">
+        <input id="videoUrl" type="text" placeholder="Enter HTTPS video URL or paste a blob: URL" />
+        <button id="loadBtn" class="primary" title="Load from URL">Load Video</button>
+      </div>
 
-    <button onclick="selectLocalVideo()">Select Local Video</button>
+      <!-- Start/End controls -->
+      <div class="row split" role="group" aria-label="Loop controls">
+        <div class="row-inline">
+          <strong>Start</strong>
+          <input id="startTimeMin" type="number" min="0" placeholder="Min" style="width:90px">
+          <input id="startTimeSec" type="number" min="0" max="59" placeholder="Sec" style="width:90px">
+          <button id="setStartNow" class="ghost" title="Set start to current time">Set to Now</button>
+        </div>
+        <div class="row-inline">
+          <strong>End</strong>
+          <input id="endTimeMin" type="number" min="0" placeholder="Min" style="width:90px">
+          <input id="endTimeSec" type="number" min="0" max="59" placeholder="Sec" style="width:90px">
+          <button id="setEndNow" class="ghost" title="Set end to current time">Set to Now</button>
+        </div>
+      </div>
 
-    <video id="videoPlayer" width="720" height="480" controls></video>
+      <div class="row three">
+        <button id="applyLoop" class="ok">Apply A‑B Loop</button>
+        <button id="clearLoop" class="ghost">Clear Loop</button>
+        <button id="openKb" class="ghost" title="Keyboard help">⌨️ Shortcuts</button>
+      </div>
 
-    <script>
-        async function uploadFile() {
-            const fileInput = document.getElementById("fileInput");
-            const file = fileInput.files[0]; // Get the first file selected
+      <!-- Local file + Drop zone -->
+      <div class="row split">
+        <button id="selectLocal" class="primary">Select Local Video</button>
+        <div id="drop" class="drop">Drop a video file here</div>
+      </div>
 
-            if (!file) {
-                alert("Please select a file first.");
-                return;
-            }
+      <!-- Mixed content status + tips go here -->
+      <div id="status" class="help" aria-live="polite"></div>
 
-            const accessToken = "sl-Wm"; // Replace this with your actual access token
-            const dropboxPath = `/test/test/${Date.now()}.mp4`;
+      <!-- Video -->
+      <div class="video-wrap">
+        <video id="videoPlayer" width="720" height="480" controls crossorigin="anonymous"></video>
+      </div>
 
-            try {
-                const response = await fetch("https://content.dropboxapi.com/2/files/upload", {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        "Content-Type": "application/octet-stream",
-                        "Dropbox-API-Arg": JSON.stringify({
-                            path: dropboxPath,
-                            mode: { ".tag": "add" },
-                            autorename: true,
-                            mute: false,
-                        }),
-                    },
-                    body: file, // The file to upload
-                });
+      <div class="help">
+        <div class="row-inline">
+          <div><span class="kbd">Space</span>/<span class="kbd">K</span> play/pause · <span class="kbd">J</span>/<span class="kbd">L</span> −/+10s · <span class="kbd">X</span>/<span class="kbd">C</span> −/+5s</div>
+        </div>
+        <div class="inline-note"><strong>Heads‑up on HTTP URLs:</strong> When this page is served over <em>HTTPS</em>, browsers block loading <em>HTTP</em> videos (mixed‑content). Use an <strong>HTTPS</strong> video URL, or run this page locally over <strong>http://</strong> during development, or serve your local content over <strong>https://localhost</strong> (self‑signed is okay).</div>
+      </div>
+    </div>
+  </div>
 
-                if (!response.ok) {
-                    throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
-                }
+  <!-- Optional Dropbox panel -->
+  <div class="container card" style="margin-top:18px">
+    <div class="header"><h1>Dropbox Thumbnails (optional)</h1><span class="pill">Bring your own token</span></div>
+    <div class="controls">
+      <div class="row split">
+        <input id="dbxToken" type="password" placeholder="Dropbox short‑lived access token (never commit this!)" />
+        <input id="dbxPath" type="text" placeholder="/test/test (folder path)" />
+      </div>
+      <div class="row three">
+        <button id="loadThumbs" class="primary">Load Thumbnails</button>
+        <button id="clearThumbs" class="ghost">Clear</button>
+        <span></span>
+      </div>
+      <div id="thumbGrid" class="grid" aria-live="polite"></div>
+      <div class="help">Security tip: avoid hard‑coding tokens in client code. Prefer OAuth/PKCE or a tiny HTTPS proxy that injects tokens server‑side.</div>
+    </div>
+  </div>
 
-                const data = await response.json();
-                console.log("File uploaded successfully:", data);
-                alert("File uploaded successfully.");
-            } catch (error) {
-                console.error("Error uploading file:", error);
-                alert("Error uploading file. See console for more details.");
-            }
+  <template id="kbTemplate">
+    <div class="inline-note">
+      <div style="font-weight:700;margin-bottom:6px">Keyboard Shortcuts</div>
+      <div><span class="kbd">Space</span>/<span class="kbd">K</span> — Play/Pause</div>
+      <div><span class="kbd">J</span>/<span class="kbd">L</span> — −/+10s</div>
+      <div><span class="kbd">X</span>/<span class="kbd">C</span> — −/+5s</div>
+      <div><span class="kbd">A</span>/<span class="kbd">B</span> — Set A/B to current time</div>
+      <div><span class="kbd">G</span> — Go to A (start)</div>
+    </div>
+  </template>
+
+  <script>
+    // ===== Utilities =====
+    const $ = (id) => document.getElementById(id);
+    const status = $("status");
+    const video = $("videoPlayer");
+
+    let loopStart = null; // seconds
+    let loopEnd = null;   // seconds
+    let lastObjectUrl = null; // revoke when replaced
+
+    const fmtTime = (s) => {
+      if (typeof s !== 'number' || isNaN(s)) return '--:--';
+      const m = Math.floor(s / 60); const ss = Math.floor(s % 60).toString().padStart(2,'0');
+      return `${m}:${ss}`;
+    };
+
+    function parseInputs() {
+      const sm = parseInt($("startTimeMin").value || '0', 10);
+      const ss = parseInt($("startTimeSec").value || '0', 10);
+      const emRaw = $("endTimeMin").value; const esRaw = $("endTimeSec").value;
+      const em = emRaw === '' ? null : parseInt(emRaw, 10);
+      const es = esRaw === '' ? null : parseInt(esRaw, 10);
+      const start = Math.max(0, (isNaN(sm)?0:sm)*60 + (isNaN(ss)?0:ss));
+      const end = (em===null && es===null) ? null : Math.max(0, (isNaN(em)?0:em)*60 + (isNaN(es)?0:es));
+      return {start, end};
+    }
+
+    function applyLoopPoints(fromInputs=true){
+      if (fromInputs){
+        const {start, end} = parseInputs();
+        loopStart = start;
+        loopEnd = (end===null) ? null : end;
+      }
+      // Validate
+      if (loopEnd !== null && loopEnd <= loopStart){
+        setStatus(`End (${fmtTime(loopEnd)}) must be after Start (${fmtTime(loopStart)}).`, 'error');
+        return false;
+      }
+      setStatus(loopEnd===null ? `Loop from ${fmtTime(loopStart)} to end of video.` : `Loop set: ${fmtTime(loopStart)} → ${fmtTime(loopEnd)}.`, 'ok');
+      return true;
+    }
+
+    function setStatus(msg, kind='info'){
+      const color = kind==='error' ? 'var(--danger)' : kind==='ok' ? 'var(--ok)' : 'var(--muted)';
+      status.innerHTML = msg ? `<div class="inline-note" style="border-color:${color}"><strong>${kind==='error'?'Error':kind==='ok'?'OK':'Info'}:</strong> ${msg}</div>` : '';
+    }
+
+    function clearLoop(){
+      loopStart = 0; loopEnd = null;
+      $("startTimeMin").value = $("startTimeSec").value = '';
+      $("endTimeMin").value = $("endTimeSec").value = '';
+      setStatus('Loop cleared.');
+    }
+
+    // ===== Loading logic (handles HTTP/HTTPS + local files) =====
+    async function loadFromUrl(url){
+      if (!url) return setStatus('Please enter a video URL.','error');
+      // Mixed content guard
+      if (location.protocol === 'https:' && url.startsWith('http://')){
+        setStatus(`This page is HTTPS, but the video URL is HTTP. Browsers block mixed content. Use an HTTPS URL, run this page over http:// for development, or serve your local content over https://localhost.`, 'error');
+        return;
+      }
+      // Revoke previous blob if any
+      if (lastObjectUrl){ URL.revokeObjectURL(lastObjectUrl); lastObjectUrl = null; }
+
+      video.src = url;
+      await waitForMetadata();
+      // Jump to start if defined
+      const startAt = (typeof loopStart==='number' ? loopStart : 0);
+      video.currentTime = Math.min(startAt, (video.duration || startAt));
+      try{ await video.play(); }catch(e){ /* ignore autoplay block */ }
+    }
+
+    function waitForMetadata(){
+      return new Promise(res=>{
+        if (!isNaN(video.duration) && video.duration>0){ return res(); }
+        video.addEventListener('loadedmetadata', ()=>res(), {once:true});
+      });
+    }
+
+    function handleTimeUpdate(){
+      if (loopStart==null && loopEnd==null) return; // no loop configured yet
+      const start = typeof loopStart==='number' ? loopStart : 0;
+      const end = (loopEnd===null || typeof loopEnd!=='number') ? video.duration : loopEnd;
+      const epsilon = 0.15;
+      if (video.currentTime < start - epsilon){
+        video.currentTime = start;
+      } else if (video.currentTime >= end - epsilon){
+        video.currentTime = start;
+        // keep playing to continue the loop
+        if (video.paused) video.play().catch(()=>{});
+      }
+    }
+
+    video.addEventListener('timeupdate', handleTimeUpdate);
+
+    // Pause/resume on window blur/focus
+    let wasPlayingBeforeBlur = false;
+    window.addEventListener('blur', ()=>{ if (!video.paused){ video.pause(); wasPlayingBeforeBlur=true; } else { wasPlayingBeforeBlur=false; } });
+    window.addEventListener('focus', ()=>{ if (wasPlayingBeforeBlur && video.paused){ video.play().catch(()=>{}); wasPlayingBeforeBlur=false; } });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e)=>{
+      if (['INPUT','TEXTAREA'].includes(document.activeElement.tagName)) return;
+      switch(e.key.toLowerCase()){
+        case ' ': case 'k': e.preventDefault(); video.paused?video.play():video.pause(); break;
+        case 'j': video.currentTime = Math.max(0, video.currentTime - 10); break;
+        case 'l': video.currentTime = Math.min(video.duration||Infinity, video.currentTime + 10); break;
+        case 'x': video.currentTime = Math.max(0, video.currentTime - 5); break;
+        case 'c': video.currentTime = Math.min(video.duration||Infinity, video.currentTime + 5); break;
+        case 'a': loopStart = Math.floor(video.currentTime); syncStartInputs(loopStart); setStatus(`Start set to ${fmtTime(loopStart)}.`); break;
+        case 'b': loopEnd = Math.floor(video.currentTime); syncEndInputs(loopEnd); setStatus(`End set to ${fmtTime(loopEnd)}.`); break;
+        case 'g': video.currentTime = (typeof loopStart==='number'?loopStart:0); break;
+      }
+    });
+
+    function syncStartInputs(sec){
+      $("startTimeMin").value = Math.floor(sec/60);
+      $("startTimeSec").value = Math.floor(sec%60);
+    }
+    function syncEndInputs(sec){
+      $("endTimeMin").value = Math.floor(sec/60);
+      $("endTimeSec").value = Math.floor(sec%60);
+    }
+
+    // Buttons
+    $("loadBtn").addEventListener('click', ()=>{
+      applyLoopPoints();
+      loadFromUrl($("videoUrl").value.trim());
+    });
+
+    $("applyLoop").addEventListener('click', ()=>{
+      if(!applyLoopPoints()) return;
+      // Seek to start immediately if we already have a video
+      if (!isNaN(video.duration)){
+        video.currentTime = typeof loopStart==='number'? loopStart : 0;
+        video.play().catch(()=>{});
+      }
+    });
+
+    $("clearLoop").addEventListener('click', ()=> clearLoop());
+
+    $("setStartNow").addEventListener('click', ()=>{ syncStartInputs(Math.floor(video.currentTime||0)); applyLoopPoints(); });
+    $("setEndNow").addEventListener('click', ()=>{ syncEndInputs(Math.floor(video.currentTime||0)); applyLoopPoints(); });
+
+    // Local file picker (now respects A‑B loop because we route through the same loader)
+    $("selectLocal").addEventListener('click', ()=>{
+      const input = document.createElement('input');
+      input.type = 'file'; input.accept = 'video/*';
+      input.onchange = (e)=>{ const file = e.target.files[0]; if(!file) return; loadLocalFile(file); };
+      input.click();
+    });
+
+    // Drag & drop
+    const drop = $("drop");
+    ['dragenter','dragover'].forEach(ev=> drop.addEventListener(ev,(e)=>{e.preventDefault(); drop.classList.add('drag');}));
+    ['dragleave','drop'].forEach(ev=> drop.addEventListener(ev,(e)=>{e.preventDefault(); if(ev==='drop'){ const file = e.dataTransfer.files?.[0]; if(file) loadLocalFile(file);} drop.classList.remove('drag'); }));
+
+    function loadLocalFile(file){
+      if (lastObjectUrl){ URL.revokeObjectURL(lastObjectUrl); lastObjectUrl=null; }
+      const url = URL.createObjectURL(file);
+      lastObjectUrl = url;
+      $("videoUrl").value = url; // show the blob: URL
+      applyLoopPoints();
+      loadFromUrl(url);
+    }
+
+    // Help dialog
+    $("openKb").addEventListener('click', ()=>{
+      const t = document.getElementById('kbTemplate');
+      setStatus(t.innerHTML);
+    });
+
+    // Deep-link support ?link=...
+    (function initFromQuery(){
+      const p = new URLSearchParams(location.search);
+      const link = p.get('link');
+      if (link){ $("videoUrl").value = link; }
+      const s = p.get('s'); const e = p.get('e');
+      if (s){ const n = Math.max(0, parseInt(s,10)||0); syncStartInputs(n); loopStart=n; }
+      if (e){ const n = Math.max(0, parseInt(e,10)||0); syncEndInputs(n); loopEnd=n; }
+      if (link){ applyLoopPoints(false); loadFromUrl(link); }
+    })();
+
+    // ===== Optional: Dropbox thumbnails =====
+    async function fetchTemporaryLink(token, filePath){
+      const url = "https://api.dropboxapi.com/2/files/get_temporary_link";
+      const res = await fetch(url,{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({path:filePath})});
+      if(!res.ok) throw new Error('temp link failed');
+      return (await res.json()).link;
+    }
+    async function fetchThumbnail(token, path){
+      const res = await fetch("https://content.dropboxapi.com/2/files/get_thumbnail_v2",{
+        method:'POST',headers:{'Authorization':`Bearer ${token}`, 'Dropbox-API-Arg': JSON.stringify({resource:{".tag":"path",path},format:{".tag":"png"},size:{".tag":"w128h128"}}), 'Content-Type':'application/octet-stream'}
+      });
+      if(!res.ok) throw new Error('thumbnail failed');
+      return URL.createObjectURL(await res.blob());
+    }
+    async function listFolder(token, path){
+      const res = await fetch("https://api.dropboxapi.com/2/files/list_folder",{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},body:JSON.stringify({path,recursive:false,include_media_info:true,limit:100})});
+      if(!res.ok) throw new Error('list folder failed');
+      return (await res.json()).entries || [];
+    }
+
+    $("loadThumbs").addEventListener('click', async()=>{
+      const token = $("dbxToken").value.trim();
+      const path = $("dbxPath").value.trim() || '/';
+      const grid = $("thumbGrid"); grid.innerHTML = '';
+      if(!token){ setStatus('Enter a Dropbox access token to use thumbnails.','error'); return; }
+      try{
+        const items = await listFolder(token, path);
+        for (const it of items){
+          if (it['.tag'] !== 'file') continue;
+          const [thumbUrl, tempLink] = await Promise.all([
+            fetchThumbnail(token, it.path_display).catch(()=>null),
+            fetchTemporaryLink(token, it.path_display).catch(()=>null)
+          ]);
+          const div = document.createElement('div');
+          div.className = 'thumb';
+          const img = document.createElement('img');
+          img.alt = it.name; img.src = thumbUrl || '';
+          const meta = document.createElement('div'); meta.className='meta'; meta.textContent = it.name;
+          div.appendChild(img); div.appendChild(meta);
+          div.addEventListener('click', ()=>{
+            if (!tempLink){ setStatus('No temporary link available for this file.','error'); return; }
+            $("videoUrl").value = tempLink; applyLoopPoints(false); loadFromUrl(tempLink);
+            window.scrollTo({top:0,behavior:'smooth'});
+          });
+          grid.appendChild(div);
         }
+      }catch(e){ setStatus('Dropbox error: '+e.message,'error'); }
+    });
 
-        function setVideo() {
-            var videoUrl = document.getElementById("videoUrl").value;
-            var startMin = document.getElementById("startTimeMin").value;
-            var startSec = document.getElementById("startTimeSec").value;
-            var endMin = document.getElementById("endTimeMin").value;
-            var endSec = document.getElementById("endTimeSec").value;
-
-            // Convert to integer or use default values
-            startMin = startMin ? parseInt(startMin) : 0;
-            startSec = startSec ? parseInt(startSec) : 0;
-            endMin = endMin ? parseInt(endMin) : undefined;
-            endSec = endSec ? parseInt(endSec) : undefined;
-
-            var video = document.getElementById("videoPlayer");
-            video.src = videoUrl;
-
-            // Set video start time or play from beginning
-            video.currentTime = startMin * 60 + startSec;
-
-            video.addEventListener("timeupdate", function () {
-                var loopEndPoint =
-                    typeof endMin !== "undefined" && typeof endSec !== "undefined"
-                        ? endMin * 60 + endSec
-                        : video.duration;
-
-                // Check if the current time is close to the loop end point
-                if (video.currentTime >= loopEndPoint - 0.5) {
-                    video.currentTime = startMin * 60 + startSec;
-                    video.play();
-                }
-            });
-
-            video.addEventListener("play", function () {
-                isVideoPlaying = true;
-            });
-
-            video.addEventListener("pause", function () {
-                isVideoPlaying = false;
-            });
-        }
-
-        function selectLocalVideo() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'video/*';
-            input.onchange = function(event) {
-                const file = event.target.files[0];
-                if (file) {
-                    const videoUrl = URL.createObjectURL(file);
-                    const video = document.getElementById('videoPlayer');
-                    video.src = videoUrl;
-                    video.play();
-                }
-            };
-            input.click();
-        }
-
-        var video;
-        var wasPlayingBeforeBlur = false; // Tracks if the video was playing before losing focus
-
-        window.onload = function () {
-            video = document.getElementById("videoPlayer");
-            window.addEventListener("blur", handleWindowBlur, false);
-            window.addEventListener("focus", handleWindowFocus, false);
-            window.addEventListener("keydown", handleKeyPress, false); // Add this line
-        };
-
-        function handleKeyPress(event) {
-            switch (event.key) {
-                case "x": // 'x' key
-                    video.currentTime = Math.max(0, video.currentTime - 5);
-                    break;
-                case "c": // 'c' key
-                    video.currentTime = Math.min(video.duration, video.currentTime + 5);
-                    break;
-            }
-        }
-
-        function handleWindowBlur() {
-            if (!video.paused) {
-                video.pause();
-                wasPlayingBeforeBlur = true; // Remember that the video was playing
-            } else {
-                wasPlayingBeforeBlur = false;
-            }
-        }
-
-        function handleWindowFocus() {
-            if (wasPlayingBeforeBlur && video.paused) {
-                video.play().catch((e) => console.error("Error attempting to play video:", e));
-                wasPlayingBeforeBlur = false;
-            }
-        }
-
-        async function fetchTemporaryLink(filePath) {
-            const accessToken = "sl.-Wm"; // Replace with your actual access token
-            const url = "https://api.dropboxapi.com/2/files/get_temporary_link";
-
-            try {
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer ${accessToken}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ path: filePath }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`Error: ${response.statusText}`);
-                }
-
-                const data = await response.json();
-                return data.link; // Assuming the response contains a property 'link' with the URL
-            } catch (error) {
-                console.error("Failed to fetch temporary link:", error);
-                return null;
-            }
-        }
-
-        async function fetchThumbnail(path) {
-            try {
-                const response = await fetch("https://content.dropboxapi.com/2/files/get_thumbnail_v2", {
-                    method: "POST",
-                    headers: {
-                        Authorization: `Bearer sl.-Wm`, // Replace with your actual access token
-                        "Dropbox-API-Arg": JSON.stringify({
-                            resource: { ".tag": "path", path: path },
-                            format: { ".tag": "png" },
-                            size: { ".tag": "w128h128" },
-                        }),
-                        "Content-Type": "application/octet-stream",
-                    },
-                });
-                const blob = await response.blob();
-                return window.URL.createObjectURL(blob);
-            } catch (error) {
-                console.error("Error fetching thumbnail:", error);
-                return null; // Return null or a default thumbnail URL
-            }
-        }
-
-        async function displayThumbnails() {
-            try {
-                const response = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
-                    method: "POST",
-                    headers: {
-                        Authorization: "", // Replace with your actual access token
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                        path: "/test/test", // Adjust the path as needed
-                        recursive: false,
-                        include_media_info: true,
-                        limit: 100,
-                    }),
-                });
-                const data = await response.json();
-
-                if (!data.entries || !Array.isArray(data.entries)) {
-                    console.error("Unexpected response structure:", data);
-                    return;
-                }
-
-                const imageContainer = document.getElementById("imageContainer");
-                for (const link of data.entries) {
-                    const thumbnailUrl = await fetchThumbnail(link.path_display);
-                    const temp_link = await fetchTemporaryLink(link.path_display);
-
-                    const img = document.createElement("img");
-                    img.src = thumbnailUrl;
-                    img.style.width = "128px";
-                    img.style.height = "128px";
-                    img.alt = link.name;
-                    img.ontouchstart = function () {
-                        window.open("http://192.168.1.7:8888?link=" + temp_link, "_blank");
-                    };
-                    img.onclick = function () {
-                        window.open("http://192.168.1.7:8888?link=" + temp_link, "_blank");
-                    };
-
-                    imageContainer.appendChild(img);
-                }
-            } catch (error) {
-                console.error("Error:", error);
-            }
-        }
-
-        function getQueryParam() {
-            const urlParams = new URLSearchParams(window.location.search);
-            let url = urlParams.get("link");
-
-            document.getElementById("videoUrl").value = url;
-            setTimeout(function () {
-                setVideo();
-            }, 100);
-        }
-
-        getQueryParam();
-        displayThumbnails();
-    </script>
+    $("clearThumbs").addEventListener('click', ()=> $("thumbGrid").innerHTML='');
+  </script>
 </body>
 </html>
-
